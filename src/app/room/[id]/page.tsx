@@ -25,15 +25,25 @@ export default async function RoomPage(props: {
 
   // If room is waiting and user is not player 1, join as player 2
   if (user && room.status === 'waiting' && room.player_1_id !== user.id && !room.player_2_id) {
-    const { error: joinError } = await supabase
+    console.log('Attempting to join room as player 2:', { 
+      roomId: room.id, 
+      userId: user.id,
+      roomStatus: room.status,
+      player1: room.player_1_id
+    });
+    
+    const { data: updateData, error: joinError } = await supabase
       .from('rooms')
       .update({ 
         player_2_id: user.id,
         status: 'playing' 
       })
-      .eq('id', room.id);
+      .eq('id', room.id)
+      .select();
     
-    if (!joinError) {
+    console.log('Join room result:', { updateData, joinError });
+    
+    if (!joinError && updateData && updateData.length > 0) {
       // Update the room object locally instead of redirecting
       room.player_2_id = user.id;
       room.player_2 = { id: user.id, username: user.user_metadata?.username || user.email || 'Jugador 2' };
@@ -50,23 +60,6 @@ export default async function RoomPage(props: {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold capitalize">{room.game_type.replace('tictactoe', 'Tic Tac Toe')}</h1>
-            <p className="text-muted-foreground">Sala: {room.id}</p>
-          </div>
-          <div className="flex gap-4">
-            <div className={`p-4 rounded-lg border ${gameState?.current_turn === room.player_1_id ? 'border-primary bg-primary/10' : 'bg-card'}`}>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Jugador 1 (X)</p>
-              <p className="font-bold">{room.player_1?.username}</p>
-            </div>
-            <div className={`p-4 rounded-lg border ${gameState?.current_turn === room.player_2_id ? 'border-primary bg-primary/10' : 'bg-card'}`}>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Jugador 2 (O)</p>
-              <p className="font-bold">{room.player_2?.username || 'Esperando...'}</p>
-            </div>
-          </div>
-        </div>
-
         <GameBoard 
           room={room} 
           initialGameState={gameState} 

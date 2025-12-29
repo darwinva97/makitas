@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 
 import ChessBoardComponent from '@/games/chess/board'
 
@@ -11,29 +12,35 @@ export default function GameBoard({ room: initialRoom, initialGameState, userId 
   const supabase = createClient()
 
   useEffect(() => {
+    console.log('Setting up realtime subscription for room:', room.id)
+    
     const channel = supabase
       .channel(`room:${room.id}`)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'game_states',
           filter: `room_id=eq.${room.id}`,
         },
-        (payload) => {
-          setGameState(payload.new)
+        (payload: RealtimePostgresChangesPayload<{ [key: string]: any }>) => {
+          console.log('Received game_states change:', payload)
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            setGameState(payload.new)
+          }
         }
       )
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*', // Listen to all events
           schema: 'public',
           table: 'rooms',
           filter: `id=eq.${room.id}`,
         },
-        async (payload) => {
+        async (payload: RealtimePostgresChangesPayload<{ [key: string]: any }>) => {
+          console.log('Received rooms change:', payload)
           // When room updates (e.g., player 2 joins), fetch full room data with profiles
           const { data: updatedRoom } = await supabase
             .from('rooms')
@@ -46,20 +53,46 @@ export default function GameBoard({ room: initialRoom, initialGameState, userId 
             .single()
           
           if (updatedRoom) {
+            console.log('Updated room data:', updatedRoom)
             setRoom(updatedRoom)
           }
         }
       )
-      .subscribe()
+      .subscribe((status: string, err?: Error) => {
+        console.log('Subscription status:', status, err || '')
+      })
 
     return () => {
+      console.log('Removing channel')
       supabase.removeChannel(channel)
     }
-  }, [room.id, supabase])
+  }, [room.id])
 
   const board = gameState.board_state
   const isMyTurn = gameState.current_turn === userId
   const isPlayer = room.player_1_id === userId || room.player_2_id === userId
+
+  // Header with player info
+  const renderHeader = () => (
+    <div className="flex justify-between items-center mb-8">
+      <div>
+        <h1 className="text-3xl font-bold capitalize">
+          {room.game_type === 'tictactoe' ? 'Tic Tac Toe' : room.game_type}
+        </h1>
+        <p className="text-muted-foreground">Sala: {room.id.slice(0, 8)}...</p>
+      </div>
+      <div className="flex gap-4">
+        <div className={`p-4 rounded-lg border ${gameState?.current_turn === room.player_1_id ? 'border-primary bg-primary/10' : 'bg-card'}`}>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Jugador 1 {room.game_type === 'tictactoe' ? '(X)' : '(Blancas)'}</p>
+          <p className="font-bold">{room.player_1?.username || 'Cargando...'}</p>
+        </div>
+        <div className={`p-4 rounded-lg border ${gameState?.current_turn === room.player_2_id ? 'border-primary bg-primary/10' : 'bg-card'}`}>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Jugador 2 {room.game_type === 'tictactoe' ? '(O)' : '(Negras)'}</p>
+          <p className="font-bold">{room.player_2?.username || 'Esperando...'}</p>
+        </div>
+      </div>
+    </div>
+  )
 
   // --- Tic Tac Toe Logic ---
   const checkWinner = (squares: any[]) => {
@@ -144,6 +177,7 @@ export default function GameBoard({ room: initialRoom, initialGameState, userId 
       
       return (
           <div className="flex flex-col items-center gap-8">
+             {renderHeader()}
              <ChessBoardComponent 
                 initialFen={currentFen}
                 orientation={orientation}
@@ -155,6 +189,8 @@ export default function GameBoard({ room: initialRoom, initialGameState, userId 
                   <p className="text-muted-foreground">Estás observando la partida.</p>
                 ) : room.status === 'finished' ? (
                   <p className="text-xl font-bold">¡Partida finalizada!</p>
+                ) : room.status === 'waiting' ? (
+                  <p className="text-muted-foreground">Esperando que se una un oponente...</p>
                 ) : isMyTurn ? (
                   <p className="text-xl font-bold text-primary animate-pulse">¡Es tu turno!</p>
                 ) : (
@@ -166,11 +202,17 @@ export default function GameBoard({ room: initialRoom, initialGameState, userId 
   }
 
   if (room.game_type !== 'tictactoe') {
-    return <div className="p-8 text-center border rounded-lg">Juego "{room.game_type}" aún no implementado.</div>
+    return (
+      <>
+        {renderHeader()}
+        <div className="p-8 text-center border rounded-lg">Juego &quot;{room.game_type}&quot; aún no implementado.</div>
+      </>
+    )
   }
 
   return (
     <div className="flex flex-col items-center gap-8">
+      {renderHeader()}
       <div className="grid grid-cols-3 gap-2 w-full max-w-[300px]">
         {board.map((cell: string, i: number) => (
           <button
@@ -189,6 +231,8 @@ export default function GameBoard({ room: initialRoom, initialGameState, userId 
           <p className="text-muted-foreground">Estás observando la partida.</p>
         ) : room.status === 'finished' ? (
           <p className="text-xl font-bold">¡Partida finalizada!</p>
+        ) : room.status === 'waiting' ? (
+          <p className="text-muted-foreground">Esperando que se una un oponente...</p>
         ) : isMyTurn ? (
           <p className="text-xl font-bold text-primary animate-pulse">¡Es tu turno!</p>
         ) : (
