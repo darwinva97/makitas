@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { Button } from '@/components/ui/button'
-import { toast } from 'sonner'
 
 import ChessBoardComponent from '@/games/chess/board'
 
