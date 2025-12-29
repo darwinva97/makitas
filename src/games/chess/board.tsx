@@ -21,7 +21,7 @@ export default function ChessBoardComponent({
 }: ChessBoardProps) {
   const [game, setGame] = useState(new ChessGame(initialFen));
   const [fen, setFen] = useState(initialFen);
-  
+
   // Sync internal state if prop changes (e.g. from realtime update)
   useEffect(() => {
     if (initialFen !== fen) {
@@ -30,12 +30,12 @@ export default function ChessBoardComponent({
     }
   }, [initialFen]);
 
-  const onDrop = useCallback((sourceSquare: string, targetSquare: string) => {
-    if (disabled) return false;
+  const onDrop = useCallback(({ sourceSquare, targetSquare }: { piece: any; sourceSquare: string; targetSquare: string | null }) => {
+    if (disabled || !targetSquare) return false;
 
     // We need to create a new instance or clone to mutate state correctly for next move validation
     // However, our ChessGame wrapper handles mutation internally, we just need to get the result
-    
+
     // NOTE: In a real react app, we might want to avoid mutating the 'game' object directly in state
     // but for chess.js it's common to keep one instance.
     // Let's create a temp instance to validate
@@ -59,13 +59,15 @@ export default function ChessBoardComponent({
     <div className="flex flex-col items-center gap-4">
       <div className="w-full max-w-[500px] aspect-square">
         <Chessboard 
-          position={fen} 
-          onPieceDrop={onDrop}
-          boardOrientation={orientation}
-          arePiecesDraggable={!disabled}
-          customBoardStyle={{
-            borderRadius: '4px',
-            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
+          options={{
+            position: fen,
+            onPieceDrop: onDrop,
+            boardOrientation: orientation,
+            allowDragging: !disabled,
+            boardStyle: {
+              borderRadius: '4px',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
+            },
           }}
         />
       </div>
