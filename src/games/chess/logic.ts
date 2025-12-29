@@ -1,4 +1,4 @@
-import { Chess, Move } from 'chess.js';
+import { Chess, Move, Square, validateFen } from 'chess.js';
 
 export interface ChessGameState {
   fen: string;
@@ -54,7 +54,7 @@ export class ChessGame {
 
   // Get possible moves for a specific square (helpful for UI highlighting)
   public getMoves(square: string): string[] {
-    return this.game.moves({ square, verbose: true }).map((m: any) => m.to);
+    return this.game.moves({ square: square as Square, verbose: true }).map((m: any) => m.to);
   }
 
   // Helper to calculate captured pieces (chess.js doesn't provide this directly efficiently)
@@ -76,6 +76,6 @@ export class ChessGame {
   }
   
   public validateFen(fen: string): boolean {
-      return this.game.validateFen(fen).ok;
+      return validateFen(fen).ok;
   }
 }
