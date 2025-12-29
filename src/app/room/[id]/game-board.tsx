@@ -5,8 +5,9 @@ import { createClient } from '@/utils/supabase/client'
 
 import ChessBoardComponent from '@/games/chess/board'
 
-export default function GameBoard({ room, initialGameState, userId }: any) {
+export default function GameBoard({ room: initialRoom, initialGameState, userId }: any) {
   const [gameState, setGameState] = useState(initialGameState)
+  const [room, setRoom] = useState(initialRoom)
   const supabase = createClient()
 
   useEffect(() => {
@@ -22,6 +23,31 @@ export default function GameBoard({ room, initialGameState, userId }: any) {
         },
         (payload) => {
           setGameState(payload.new)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'rooms',
+          filter: `id=eq.${room.id}`,
+        },
+        async (payload) => {
+          // When room updates (e.g., player 2 joins), fetch full room data with profiles
+          const { data: updatedRoom } = await supabase
+            .from('rooms')
+            .select(`
+              *,
+              player_1:profiles!player_1_id(username, id),
+              player_2:profiles!player_2_id(username, id)
+            `)
+            .eq('id', room.id)
+            .single()
+          
+          if (updatedRoom) {
+            setRoom(updatedRoom)
+          }
         }
       )
       .subscribe()

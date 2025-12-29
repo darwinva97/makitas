@@ -25,7 +25,7 @@ export default async function RoomPage(props: {
 
   // If room is waiting and user is not player 1, join as player 2
   if (user && room.status === 'waiting' && room.player_1_id !== user.id && !room.player_2_id) {
-    await supabase
+    const { error: joinError } = await supabase
       .from('rooms')
       .update({ 
         player_2_id: user.id,
@@ -33,8 +33,12 @@ export default async function RoomPage(props: {
       })
       .eq('id', room.id);
     
-    // Refresh room data
-    return redirect(`/room/${room.id}`);
+    if (!joinError) {
+      // Update the room object locally instead of redirecting
+      room.player_2_id = user.id;
+      room.player_2 = { id: user.id, username: user.user_metadata?.username || user.email || 'Jugador 2' };
+      room.status = 'playing';
+    }
   }
 
   const { data: gameState } = await supabase
